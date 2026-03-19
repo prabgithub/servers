@@ -9,7 +9,8 @@
 #define PORT 9000
 #define BUFFER 1024
 
-
+int total_clients =0;
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 void* handle_client(void* arg){
     int client_fd = *(int*)arg;
@@ -21,6 +22,11 @@ void* handle_client(void* arg){
         break;
     buffer[n] = '\0';
     printf("client %d --> %s\n", client_fd, buffer);
+    //mutex lock to prevent race condition
+    pthread_mutex_lock(&lock);
+    total_clients++;
+    printf("total_clients--> %d\n", total_clients);
+    pthread_mutex_unlock(&lock);
     char* msg = "hi man\n";
     send(client_fd, msg, strlen(msg), 0);
     }
@@ -28,8 +34,36 @@ void* handle_client(void* arg){
     return NULL;
 }
 
-int main(){
+int send_all(int client_fd, void* buffer, int length){
+    int total = 0;
+    int n;
+    char* msg = (char*)buffer;
+    while (total<length){
+        n = send(client_fd, msg+total, length-total,0);
+        if (n<=0)
+            return -1;
+        total+=n;
+    }
+    return total;
+}
 
+
+int recv_all(int client_fd, void* buffer, int length){
+    int total = 0;
+    int n;
+    char* msg = (char*)buffer;
+    while (total<length){
+        n = recv(client_fd, msg+total, length-total, 0);
+        if (n<=0)
+            return -1;
+        total+=n;
+    }
+    return total;
+}
+
+
+
+int main(){
     //socket create server side
     int server_fd;
     server_fd = socket(AF_INET, SOCK_STREAM,0);
